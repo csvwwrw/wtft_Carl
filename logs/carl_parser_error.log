@@ -1,0 +1,22 @@
+2024-07-26 17:42:42,071 - ERROR - [5] User authorization failed: invalid access_token (4).
+Traceback (most recent call last):
+  File "c:\users\csvww\desktop\per\wtft_carl\main\carl_parser.py", line 46, in <module>
+    posts = vk.wall.get(
+            ^^^^^^^^^^^^
+  File "C:\ProgramData\miniconda3\envs\wtft\Lib\site-packages\vk_api\vk_api.py", line 737, in __call__
+    return self._vk.method(self._method, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\miniconda3\envs\wtft\Lib\site-packages\vk_api\vk_api.py", line 697, in method
+    raise error
+vk_api.exceptions.ApiError: [5] User authorization failed: invalid access_token (4).
+2024-07-26 17:42:56,233 - ERROR - [5] User authorization failed: invalid access_token (4).
+Traceback (most recent call last):
+  File "c:\users\csvww\desktop\per\wtft_carl\main\carl_parser.py", line 46, in <module>
+    posts = vk.wall.get(
+            ^^^^^^^^^^^^
+  File "C:\ProgramData\miniconda3\envs\wtft\Lib\site-packages\vk_api\vk_api.py", line 737, in __call__
+    return self._vk.method(self._method, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\miniconda3\envs\wtft\Lib\site-packages\vk_api\vk_api.py", line 697, in method
+    raise error
+vk_api.exceptions.ApiError: [5] User authorization failed: invalid access_token (4).
