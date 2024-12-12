@@ -1,0 +1,5 @@
+*.tar
+*.zip
+Dockerfile*
+mountables/config_lib
+mountables/__pycache__

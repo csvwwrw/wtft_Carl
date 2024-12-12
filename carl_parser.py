@@ -1,32 +1,28 @@
-from vk_api import VkApi
-import telebot
-import youtube_dl
 import os
-import requests
 import urllib
 import time
 import logging
-import custom_lib.config as config
-import custom_lib.logger_setup as logger_setup
+import requests
+from vk_api import VkApi
+import telebot
+import youtube_dl
+from mountables import logger_setup
+from mountables.config_lib import config
 
-
-
-###   НАСТРОЙКА ЛОГГЕРА   ###
+###   LOGGING SET UP   ###
 logger = logging.getLogger('')
-    
+
 logger_setup.double_logger_setup('carl_parser.log', 'carl_parser_error.log', logger = logger)
 
-###   КОФИГУРАЦИЯ   ###
-tg_channel = config.tg_channel
-tg_chat = config.tg_chat
-vk_domain = config.vk_domain
-alpha_domain = config.alpha_domain
+###   CONFIG   ###
+TG_CHANNEL = config.tg_channel
+VK_DOMAIN = config.vk_domain
+ALPHA_DOMAIN = config.alpha_domain
 
-last_id_path = 'ids/last_known_id.txt'
-pinned_id_path = 'ids/pinned_id.txt'
+LAST_ID_PATH = 'mountables/last_known_id.txt'
 
 blacklist = config.blacklist
-time_sleep = config.time_sleep
+TIME_SLEEP = config.time_sleep
 
 ###   ПОЛУЧЕНИЕ АПИ ВК И ТЕЛЕГИ   ###
 vk_session = VkApi(token = config.VK_TOKEN, api_version = config.API_VERSION)
@@ -38,17 +34,17 @@ bot = telebot.TeleBot(config.TG_TOKEN)
 while True:
 
 ###   ПОДГРУЗКА ПОСЛЕДНЕГО АЙПИ   ###
-    with open(last_id_path, "r") as file:
-            last_id = int(file.read())
-    
+    with open(LAST_ID_PATH, "r", encoding = "utf-8") as file:
+        last_id = int(file.read())
+
     ###  ПОДГРУЖАЕМ ПОСЛЕДНИЕ 10 ПОСТОВ    ###
     try:
         posts = vk.wall.get(
-            domain = vk_domain,
+            domain = VK_DOMAIN,
             count = 10
             )['items'][::-1]
         posts = posts[0:9]
-        
+
         id_start = posts[0]['id']
         id_stop = posts[-1]['id']
         logger.info(f'Сканирую посты id:[{id_start} - {id_stop}]')
@@ -61,13 +57,15 @@ while True:
         photo_list = []
         post_id = post['id']
         text_in_post = post['text']
-        has_poll = False
+        HAS_POLL = False
+        source = ""
+        s = ""
 
 ###  ПРОВЕРЯЕМ ЭЛИДЖИБИЛИТИ ПОСТА    ###
 
 ###   ЕСЛИ ПОСТ ПОДХОДИТ   ###
         if int(post_id) > int(last_id):
-            if alpha_domain not in text_in_post:
+            if ALPHA_DOMAIN not in text_in_post:
                 logger.info(f'- Пост {post_id} пропущен (рекламный пост)')
 
             elif any(word in text_in_post for word in blacklist):
@@ -101,7 +99,7 @@ while True:
                                 ydl.download([video_url])
                             logger.info(f'\t Отправляется видео {video_title}')
                             bot.send_video(
-                                chat_id = tg_channel,
+                                chat_id = TG_CHANNEL,
                                 video = open(video_title, 'rb'),
                                 timeout = 500)
                             logger.info(f'\t Видео {video_title} отправлено. Удаляем.')
@@ -109,7 +107,7 @@ while True:
                         except Exception as e:
                             logger.info('ОШИБКА: ОТПРАВКА ВИДЕО')
                             logger.error(e, exc_info = True)
-                            
+
 
     ###   ЕСЛИ ЕСТЬ АУДИО, ОТПРАВЛЯЕМ ЕГО   ###
                     elif attachment['type'] == 'audio':
@@ -117,12 +115,12 @@ while True:
                             audio_url = attachment['audio']['url']
                             audio_title = attachment['audio']['title'] + '.mp3'
                             logger.info(f'\tСкачивается аудио {audio_title}')
-                            audio = requests.get(audio_url)
+                            audio = requests.get(audio_url, timeout = 100)
                             with open(audio_title, 'wb') as f:
                                 f.write(audio.content)
                             logger.info(f'\t Отправляется аудио {audio_title}')
                             bot.send_audio(
-                                chat_id = tg_channel,
+                                chat_id = TG_CHANNEL,
                                 audio = open(audio_title, 'rb'))
                             logger.info(f'\t Аудио {audio_title} отправлено. Удаляем.')
                             os.remove(audio_title)
@@ -136,12 +134,12 @@ while True:
                             doc_url = attachment['doc']['url']
                             doc_title = attachment['doc']['title'] + '.' + attachment['doc']['ext']
                             logger.info(f'\tСкачивается документ {doc_title}')
-                            doc = requests.get(doc_url)
+                            doc = requests.get(doc_url, timeout = 100)
                             with open(doc_title, 'wb') as f:
                                 f.write(doc.content)
                             logger.info(f'\t Отправляется документ {doc_title}')
                             bot.send_document(
-                                chat_id = tg_channel,
+                                chat_id = TG_CHANNEL,
                                 document = open(doc_title, 'rb'))
                             logger.info(f'\t Документ {doc_title} отправлен. Удаляем.')
                             os.remove(doc_title)
@@ -153,13 +151,12 @@ while True:
                     elif attachment['type'] == 'photo':
                         sizes = attachment['photo']['sizes']
                         height = []
-                        for i in range(len(sizes)):
-                            height.append(sizes[i]['height'])
+                        height = [sizes[i]['height'] for i in range(len(sizes))]
                         photo_list.append(sizes[height.index(max(height))]['url'])
-                        
+
     ###   ЗАПОМИНАЕМ ЧТО НУЖНО СДЕЛАТЬ ОПРОС   ###
                     elif attachment['type'] == 'poll':
-                        has_poll = True
+                        HAS_POLL = True
                         poll = attachment['poll']
 
     ###   ДЕЛАЕМ ИСТОЧНИК   ###
@@ -172,17 +169,17 @@ while True:
                         logger.info('\tПолучаем источник из источника')
                         source = post['copyright']['link']
                         s = post['copyright']['name']
-                        
+
 
     ###   ФОРМАТИРУЕМ ТЕКСТ ПОСТА   ###
-                text_in_post = (f'{text_in_post}\nисточник: <a href="{source}">{s}</a>').replace(alpha_domain, '').replace('\n\n', '\n')
+                text_in_post = (f'''{text_in_post}\nисточник: <a href="{source}">{s}</a>''').replace(ALPHA_DOMAIN, '').replace('\n\n', '\n')
                 logger.info(f'\tОтправляем пост {post_id}')
 
     ###   ОТПРАВЛЯЕМ ТЕКСТ И ФОТО, ЕСЛИ ОНО ОДНО   ###
                 if len(photo_list) == 1:
                     try:
                         bot.send_photo(
-                            tg_channel,
+                            TG_CHANNEL,
                             photo_list[0],
                             text_in_post,
                             parse_mode="HTML"
@@ -200,19 +197,19 @@ while True:
                                 telebot.types.InputMediaPhoto(urllib.request.urlopen(photo).read()))
                         photo_file[0].caption = text_in_post
                         photo_file[0].parse_mode = "HTML"
-    
+
                         bot.send_media_group(
-                            tg_channel,
+                            TG_CHANNEL,
                             photo_file
                             )
                     except Exception as e:
                         logger.info('ОШИБКА: ОТПРАВКА ГРУППЫ ФОТО')
                         logger.error(e, exc_info = True)
-                    
+
     ###   ОТПРАВЛЯЕМ ОПРОС   ###
-                if has_poll:
+                if HAS_POLL:
                     try:
-                        bot.send_poll(chat_id = tg_channel,
+                        bot.send_poll(chat_id = TG_CHANNEL,
                                       question = poll['question'],
                                       options = [i['text'] for i in poll['answers']],
                                       is_anonymous = poll['anonymous'],
@@ -227,58 +224,14 @@ while True:
     ###   СОХРАНЯЕМ НОВОЕ ПОСЛЕДНЕЕ АЙДИ ПОСТА   ###
                 logger.info(f'\t!!! Пост {post_id} отправлен !!!')
 
-            with open(last_id_path, "w") as file:
+            with open(LAST_ID_PATH, "w", encoding = "utf-8") as file:
                 file.write(str(post_id))
 
-###   ОТПИНИВАЕМ ЦИКЛ   ###
-    time.sleep(10)
-    with open(pinned_id_path, "r") as file:
-            pinned_id = int(file.read())
-                            
-    if bot.get_chat(tg_chat).pinned_message.message_id != pinned_id:
-        while bot.get_chat(tg_chat).pinned_message.message_id != pinned_id:
-            try:
-                bot.unpin_chat_message(tg_chat)
-                time.sleep(5)
-                logger.info('Сообщения, отправленные за цикл, откреплены')
-            except Exception as e:
-                logging.info('ОШИБКА: ОТКРЕПЛЕНИЕ СООБЩЕНИЙ')
-                logging.error(e, exc_info = True)
-
-
 ###   ОТПРАВЛЯЕМ БОТ СПАТЬ   ###
-    with open(last_id_path, "r") as file:
-            new_last_id = int(file.read())
+    with open(LAST_ID_PATH, "r", encoding = 'utf-8') as file:
+        new_last_id = int(file.read())
     if new_last_id != last_id:
         logger.info(f'Новое last_id = {post_id}. Бот идёт спать.\n\n')
     else:
         logger.info('Новых сообщений нет. Бот идёт спать.\n\n')
-    time.sleep(time_sleep)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    time.sleep(TIME_SLEEP)
